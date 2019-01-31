@@ -20,6 +20,7 @@ package org.apache.rocketmq.spring.config;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.spring.annotation.RocketMQTransactionListener;
 import org.apache.rocketmq.spring.core.RocketMQLocalTransactionListener;
+import org.apache.rocketmq.spring.core.RocketMQLocalTransactionMessageChangeableListener;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanCreationException;
@@ -86,16 +87,17 @@ public class RocketMQTransactionAnnotationProcessor
             throw new MQClientException("Bad usage of @RocketMQTransactionListener, " +
                 "the class must work with RocketMQTemplate", null);
         }
-        if (!RocketMQLocalTransactionListener.class.isAssignableFrom(bean.getClass())) {
+        if (!RocketMQLocalTransactionListener.class.isAssignableFrom(bean.getClass())&&
+                !RocketMQLocalTransactionMessageChangeableListener.class.isAssignableFrom(bean.getClass())) {
             throw new MQClientException("Bad usage of @RocketMQTransactionListener, " +
-                "the class must implement interface RocketMQLocalTransactionListener",
+                "the class must implement interface RocketMQLocalTransactionListener or RocketMQLocalTransactionMessageChangeableListener",
                 null);
         }
         TransactionHandler transactionHandler = new TransactionHandler();
         transactionHandler.setBeanFactory(this.beanFactory);
         transactionHandler.setName(listener.txProducerGroup());
         transactionHandler.setBeanName(bean.getClass().getName());
-        transactionHandler.setListener((RocketMQLocalTransactionListener) bean);
+        transactionHandler.setListener(bean);
         transactionHandler.setCheckExecutor(listener.corePoolSize(), listener.maximumPoolSize(),
                 listener.keepAliveTime(), listener.blockingQueueSize());
 

@@ -19,6 +19,7 @@ package org.apache.rocketmq.spring.config;
 
 import io.netty.util.internal.ConcurrentSet;
 import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.spring.core.ChangeableMessageTransactionResult;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.beans.factory.DisposableBean;
 

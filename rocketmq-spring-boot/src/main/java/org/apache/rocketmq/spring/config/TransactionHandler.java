@@ -18,6 +18,7 @@
 package org.apache.rocketmq.spring.config;
 
 import org.apache.rocketmq.spring.core.RocketMQLocalTransactionListener;
+import org.apache.rocketmq.spring.core.RocketMQLocalTransactionMessageChangeableListener;
 import org.springframework.beans.factory.BeanFactory;
 
 import java.util.concurrent.LinkedBlockingDeque;
@@ -27,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 class TransactionHandler {
     private String name;
     private String beanName;
-    private RocketMQLocalTransactionListener bean;
+    private Object bean;
     private BeanFactory beanFactory;
     private ThreadPoolExecutor checkExecutor;
 
@@ -55,11 +56,11 @@ class TransactionHandler {
         this.beanFactory = beanFactory;
     }
 
-    public void setListener(RocketMQLocalTransactionListener listener) {
+    public void setListener(Object listener) {
         this.bean = listener;
     }
 
-    public RocketMQLocalTransactionListener getListener() {
+    public Object getListener() {
         return this.bean;
     }
 
@@ -72,4 +73,6 @@ class TransactionHandler {
     public ThreadPoolExecutor getCheckExecutor() {
         return checkExecutor;
     }
+
+
 }

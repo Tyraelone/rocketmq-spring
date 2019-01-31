@@ -17,13 +17,15 @@
 package org.apache.rocketmq.spring.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.rocketmq.client.QueryResult;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.LocalTransactionState;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.client.producer.TransactionListener;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageExt;
-import org.apache.rocketmq.spring.core.RocketMQLocalTransactionState;
-import org.apache.rocketmq.spring.core.RocketMQLocalTransactionListener;
+import org.apache.rocketmq.spring.core.*;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
@@ -31,6 +33,7 @@ import org.springframework.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.Charset;
+import java.util.Date;
 import java.util.Objects;
 
 public class RocketMQUtil {
@@ -51,6 +54,58 @@ public class RocketMQUtil {
             }
         };
     }
+
+    public static TransactionListener convert(RocketMQLocalTransactionMessageChangeableListener listener, RocketMQTemplate template) {
+        return new TransactionListener() {
+            @Override
+            public LocalTransactionState executeLocalTransaction(Message message, Object obj) {
+                ChangeableMessageTransactionResult result = listener.executeLocalTransaction(message, obj);
+                result=rollbackAndSendNew(result,template,message);
+                return convertLocalTransactionState(result.getState());
+            }
+
+            @Override
+            public LocalTransactionState checkLocalTransaction(MessageExt messageExt) {
+                ChangeableMessageTransactionResult result = listener.checkLocalTransaction(messageExt);
+                result=rollbackAndSendNew(result,template,messageExt);
+                return convertLocalTransactionState(result.getState());
+            }
+
+            private ChangeableMessageTransactionResult rollbackAndSendNew(ChangeableMessageTransactionResult result,RocketMQTemplate template,Message message){
+                if(RocketMQLocalTransactionState.COMMIT.equals(result.getState())){
+                    if(result.isChange()){
+                        result.setState(RocketMQLocalTransactionState.ROLLBACK);
+                        try {
+                            QueryResult queryResult= template.getProducer().queryMessage(message.getTopic(),message.getKeys(),1,0L,System.currentTimeMillis()+10*1000*60);
+
+                            if(!queryResult.getMessageList().isEmpty()){
+                                return result;
+                            }
+                        } catch (MQClientException | InterruptedException e) {
+                            if(e instanceof MQClientException){
+                                if( ((MQClientException) e).getResponseCode()==208){
+
+
+                                     SendResult sendResult= template.syncSend(result.getMessage().getTopic(),convertToSpringMessage(message));
+                                     if (sendResult.getSendStatus()!= SendStatus.SEND_OK){
+                                         result.setState(RocketMQLocalTransactionState.UNKNOWN);
+                                     }
+                                    return  result;
+                                }
+
+                            }
+                            log.error("",e);
+                            result.setState(RocketMQLocalTransactionState.UNKNOWN);
+                        }
+
+                    }
+                }
+                return result;
+            }
+        };
+    }
+
+
 
     private static LocalTransactionState convertLocalTransactionState(RocketMQLocalTransactionState state) {
         switch (state) {

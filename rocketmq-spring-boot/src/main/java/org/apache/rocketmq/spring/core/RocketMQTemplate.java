@@ -28,6 +28,7 @@ import org.apache.rocketmq.client.producer.TransactionMQProducer;
 import org.apache.rocketmq.client.producer.TransactionSendResult;
 import org.apache.rocketmq.client.producer.selector.SelectMessageQueueByHash;
 import org.apache.rocketmq.spring.config.RocketMQConfigUtils;
+import org.apache.rocketmq.spring.support.RocketMQHeaders;
 import org.apache.rocketmq.spring.support.RocketMQUtil;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
@@ -45,6 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
 @SuppressWarnings({"WeakerAccess", "unused"})
 public class RocketMQTemplate extends AbstractMessageSendingTemplate<String> implements InitializingBean, DisposableBean {
@@ -541,6 +543,29 @@ public class RocketMQTemplate extends AbstractMessageSendingTemplate<String> imp
     }
 
     /**
+     * Send Changeable Message in Transaction
+     *
+     * this message must have an unique Business Key
+     * for example:
+     * Message<String> msg1 = MessageBuilder
+     * 				.withPayload("test message")
+     * 				.setHeader(RocketMQHeaders.KEYS,"business key")
+     * 				.build();
+     *
+     * @param txProducerGroup see sendMessageInTransaction
+     * @param destination see sendMessageInTransaction
+     * @param message see sendMessageInTransaction
+     * @param arg see sendMessageInTransaction
+     * @return
+     * @throws MessagingException
+     */
+    public TransactionSendResult sendChangeableMessageInTransaction(final String txProducerGroup, final String destination, final Message<?> message, final Object arg) throws MessagingException {
+        String key= (String) message.getHeaders().get(RocketMQHeaders.KEYS);
+        Assert.isTrue(!StringUtils.isEmpty(key),"changeableMessage must have a key");
+        return   sendMessageInTransaction(txProducerGroup,destination,message,arg);
+    }
+
+    /**
      * Remove a TransactionMQProducer from cache by manual.
      * <p>Note: RocketMQTemplate can release all cached producers when bean destroying, it is not recommended to directly
      * use this method by user.
@@ -568,7 +593,7 @@ public class RocketMQTemplate extends AbstractMessageSendingTemplate<String> imp
      * @return true if producer is created and started; false if the named producer already exists in cache.
      * @throws MessagingException
      */
-    public boolean createAndStartTransactionMQProducer(String txProducerGroup, RocketMQLocalTransactionListener transactionListener,
+    public boolean createAndStartTransactionMQProducer(String txProducerGroup, Object transactionListener,
                                                        ExecutorService executorService) throws MessagingException {
         txProducerGroup = getTxProducerGroupName(txProducerGroup);
         if (cache.containsKey(txProducerGroup)) {
@@ -587,12 +612,23 @@ public class RocketMQTemplate extends AbstractMessageSendingTemplate<String> imp
         return true;
     }
 
-    private TransactionMQProducer createTransactionMQProducer(String name, RocketMQLocalTransactionListener transactionListener,
+    private TransactionMQProducer createTransactionMQProducer(String name, Object transactionListener,
                                                               ExecutorService executorService) {
         Assert.notNull(producer, "Property 'producer' is required");
         Assert.notNull(transactionListener, "Parameter 'transactionListener' is required");
         TransactionMQProducer txProducer = new TransactionMQProducer(name);
-        txProducer.setTransactionListener(RocketMQUtil.convert(transactionListener));
+
+        if(RocketMQLocalTransactionListener.class.isAssignableFrom(transactionListener.getClass())){
+
+            txProducer.setTransactionListener(RocketMQUtil.convert((RocketMQLocalTransactionListener)transactionListener));
+        }
+
+
+        if(RocketMQLocalTransactionMessageChangeableListener.class.isAssignableFrom(transactionListener.getClass())){
+
+            txProducer.setTransactionListener(RocketMQUtil.convert((RocketMQLocalTransactionMessageChangeableListener)transactionListener,this));
+        }
+
 
         txProducer.setNamesrvAddr(producer.getNamesrvAddr());
         if (executorService != null) {

@@ -86,7 +86,7 @@ public class RocketMQUtil {
                                 if( ((MQClientException) e).getResponseCode()==208){
 
 
-                                     SendResult sendResult= template.syncSend(result.getMessage().getTopic(),convertToSpringMessage(message));
+                                     SendResult sendResult= template.syncSendOrderly(result.getMessage().getTopic(),convertToSpringMessage(message),message.getKeys());
                                      if (sendResult.getSendStatus()!= SendStatus.SEND_OK){
                                          result.setState(RocketMQLocalTransactionState.UNKNOWN);
                                      }

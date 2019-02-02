@@ -559,10 +559,21 @@ public class RocketMQTemplate extends AbstractMessageSendingTemplate<String> imp
      * @return
      * @throws MessagingException
      */
-    public TransactionSendResult sendChangeableMessageInTransaction(final String txProducerGroup, final String destination, final Message<?> message, final Object arg) throws MessagingException {
-        String key= (String) message.getHeaders().get(RocketMQHeaders.KEYS);
-        Assert.isTrue(!StringUtils.isEmpty(key),"changeableMessage must have a key");
-        return   sendMessageInTransaction(txProducerGroup,destination,message,arg);
+    public TransactionSendResult sendChangeableMessageInTransaction(final String txProducerGroup, final String destination, final Message<?> message,String businessKey, final Object arg) throws MessagingException {
+
+        Assert.isTrue(!StringUtils.isEmpty(businessKey),"changeableMessage must have a businessKey");
+        String keys = (String) message.getHeaders().get(RocketMQHeaders.KEYS);
+        MessageBuilder builder = MessageBuilder
+                .withPayload(message.getPayload())
+                .copyHeaders(message.getHeaders());
+        if(!StringUtils.isEmpty(keys)){
+            keys+=(" "+businessKey);
+        }else {
+            keys=businessKey;
+        }
+      Message  newMessage=builder.setHeader(RocketMQHeaders.KEYS,keys).build();
+
+        return   sendMessageInTransaction(txProducerGroup,destination,newMessage,arg);
     }
 
     /**

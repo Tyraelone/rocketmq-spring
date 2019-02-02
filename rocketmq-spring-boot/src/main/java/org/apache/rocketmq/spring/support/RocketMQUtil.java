@@ -86,7 +86,7 @@ public class RocketMQUtil {
                                 if( ((MQClientException) e).getResponseCode()==208){
 
 
-                                     SendResult sendResult= template.syncSendOrderly(result.getMessage().getTopic(),convertToSpringMessage(message),message.getKeys());
+                                     SendResult sendResult= template.syncSend(result.getMessage().getTopic(),convertToSpringMessage(result.getMessage()));
                                      if (sendResult.getSendStatus()!= SendStatus.SEND_OK){
                                          result.setState(RocketMQLocalTransactionState.UNKNOWN);
                                      }
@@ -94,7 +94,7 @@ public class RocketMQUtil {
                                 }
 
                             }
-                            log.error("",e);
+                            log.error("rollbackAndSendNew error",e);
                             result.setState(RocketMQLocalTransactionState.UNKNOWN);
                         }
 
